@@ -14,12 +14,12 @@
 #include "FWCore/Common/interface/TriggerNames.h"
 #include "TTree.h"
 #include "TFile.h"
-#include "TClonesArray.h"
 #include <iostream>
 #include <vector>
 #include <set>
 #include <map>
 #include <boost/regex.hpp>
+#include "TH1D.h"
 
 inline void HERE(const char *msg) {
   if (0 && msg) edm::LogWarning("GammaJetAnalysis") << msg;
@@ -87,6 +87,11 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
   hoRecHitName_        = iConfig.getParameter<std::string>("hoRecHitName");
   rootHistFilename_    = iConfig.getParameter<std::string>("rootHistFilename");
   pvCollName_          = iConfig.getParameter<std::string>("pvCollName");
+  offlineBSName_       = iConfig.getParameter<std::string>("beamSpotName");
+  conversionCollName_  = iConfig.getParameter<std::string>("conversionsName");
+  electronCollName_    = iConfig.getParameter<std::string>("electronCollName");
+  photonIDTightCollName_=iConfig.getParameter<edm::InputTag>("photonIdTightName");
+  photonIDLooseCollName_=iConfig.getParameter<edm::InputTag>("photonIdLooseName");
   prodProcess_         = "MYGAMMA";
   if (iConfig.exists("prodProcess"))
     prodProcess_ = iConfig.getUntrackedParameter<std::string>("prodProcess");
@@ -120,15 +125,14 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
     tok_HBHE_        = consumes<edm::SortedCollection<HBHERecHit,edm::StrictWeakOrdering<HBHERecHit> > >(hbheRecHitName_);
     tok_HF_          = consumes<edm::SortedCollection<HFRecHit,edm::StrictWeakOrdering<HFRecHit> > >(hfRecHitName_);
     tok_HO_          = consumes<edm::SortedCollection<HORecHit,edm::StrictWeakOrdering<HORecHit> > >(hoRecHitName_);
-    tok_loosePhoton_ = consumes<edm::ValueMap<Bool_t> >(edm::InputTag("PhotonIDProdGED","PhotonCutBasedIDLoose"));
-    tok_tightPhoton_ = consumes<edm::ValueMap<Bool_t> >(edm::InputTag("PhotonIDProdGED:PhotonCutBasedIDTight"));
+    tok_loosePhoton_ = consumes<edm::ValueMap<Bool_t> >(photonIDLooseCollName_);
+    tok_tightPhoton_ = consumes<edm::ValueMap<Bool_t> >(photonIDTightCollName_);
     tok_PFCand_      = consumes<reco::PFCandidateCollection>(edm::InputTag("particleFlow"));
-    tok_Vertex_      = consumes<reco::VertexCollection>(edm::InputTag("offlinePrimaryVertices"));
-    tok_GsfElec_     = consumes<reco::GsfElectronCollection>(edm::InputTag("gsfElectrons"));
+    tok_PV_      = consumes<reco::VertexCollection>(pvCollName_);
+    tok_GsfElec_     = consumes<reco::GsfElectronCollection>(electronCollName_);
     tok_Rho_         = consumes<double>(rhoCollection_);
-    tok_Conv_        = consumes<reco::ConversionCollection>(edm::InputTag("allConversions"));
-    tok_BS_          = consumes<reco::BeamSpot>(edm::InputTag("offlineBeamSpot"));
-    tok_PV_          = consumes<std::vector<reco::Vertex> >(pvCollName_);
+    tok_Conv_        = consumes<reco::ConversionCollection>(conversionCollName_);
+    tok_BS_          = consumes<reco::BeamSpot>(offlineBSName_);
     tok_PFMET_       = consumes<reco::PFMETCollection>(pfMETColl);
     tok_PFType1MET_  = consumes<reco::PFMETCollection>(pfType1METColl);
     tok_TrigRes_     = consumes<edm::TriggerResults>(edm::InputTag("TriggerResults::HLT"));
@@ -153,15 +157,14 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
     tok_HO_          = consumes<edm::SortedCollection<HORecHit,edm::StrictWeakOrdering<HORecHit> > >(edm::InputTag(prod,hoRecHitName_,an));
     //tok_loosePhoton_ = consumes<edm::ValueMap<Bool_t> >(edm::InputTag("PhotonIDProdGED","PhotonCutBasedIDLoose"));
     //tok_tightPhoton_ = consumes<edm::ValueMap<Bool_t> >(edm::InputTag("PhotonIDProdGED:PhotonCutBasedIDTight"));
-    tok_loosePhotonV_ = consumes<std::vector<Bool_t> >(edm::InputTag(prod,"PhotonIDProdGED:PhotonCutBasedIDLoose",an));
-    tok_tightPhotonV_ = consumes<std::vector<Bool_t> >(edm::InputTag(prod,"PhotonIDProdGED:PhotonCutBasedIDTight",an));
+    tok_loosePhotonV_ = consumes<std::vector<Bool_t> >(edm::InputTag(prod,photonIDLooseCollName_.encode(),an));
+    tok_tightPhotonV_ = consumes<std::vector<Bool_t> >(edm::InputTag(prod,photonIDTightCollName_.encode(),an));
     tok_PFCand_      = consumes<reco::PFCandidateCollection>(edm::InputTag(prod,"particleFlow",an));
-    tok_Vertex_      = consumes<reco::VertexCollection>(edm::InputTag(prod,"offlinePrimaryVertices",an));
-    tok_GsfElec_     = consumes<reco::GsfElectronCollection>(edm::InputTag(prod,"gedGsfElectrons",an));
+    tok_PV_      = consumes<reco::VertexCollection>(edm::InputTag(prod,pvCollName_,an));
+    tok_GsfElec_     = consumes<reco::GsfElectronCollection>(edm::InputTag(prod,electronCollName_,an));
     tok_Rho_         = consumes<double>(edm::InputTag(prod,rhoCollection_.label(),an));
-    tok_Conv_        = consumes<reco::ConversionCollection>(edm::InputTag(prod,"allConversions",an));
-    tok_BS_          = consumes<reco::BeamSpot>(edm::InputTag(prod,"offlineBeamSpot",an));
-    tok_PV_          = consumes<std::vector<reco::Vertex> >(edm::InputTag(prod,pvCollName_,an));
+    tok_Conv_        = consumes<reco::ConversionCollection>(edm::InputTag(prod,conversionCollName_,an));
+    tok_BS_          = consumes<reco::BeamSpot>(edm::InputTag(prod,offlineBSName_,an));
     tok_PFMET_       = consumes<reco::PFMETCollection>(edm::InputTag(prod,pfMETColl.label(),an));
     tok_PFType1MET_  = consumes<reco::PFMETCollection>(edm::InputTag(prod,pfType1METColl.label(),an));
     TString HLTlabel = "TriggerResults::HLT";
@@ -169,6 +172,14 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
       HLTlabel.ReplaceAll("HLT","reHLT");
     tok_TrigRes_     = consumes<edm::TriggerResults>(edm::InputTag(prod,HLTlabel.Data(),an));
   }
+
+  hJet1Pt = new TH1D("hJet1Pt","Jet1Pt;p_{jet1,T};count",100,0.,500.);
+  hJet2Pt = new TH1D("hJet2Pt","Jet2Pt;p_{jet2,T};count",100,0.,500.);
+  hJet3Pt = new TH1D("hJet3Pt","Jet3Pt;p_{jet3,T};count",100,0.,500.);
+  hJet1PtOrd = new TH1D("hJet1PtOrd","Jet1Pt ordered;p_{jet1,T};count",100,0.,500.);
+  hJet2PtOrd = new TH1D("hJet2PtOrd","Jet2Pt ordered;p_{jet2,T};count",100,0.,500.);
+  hJet3PtOrd = new TH1D("hJet3PtOrd","Jet3Pt ordered;p_{jet3,T};count",100,0.,500.);
+
 }
 
 GammaJetAnalysis::~GammaJetAnalysis() {}
@@ -387,9 +398,6 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
   edm::Handle<reco::PFCandidateCollection> pfHandle;
   iEvent.getByToken(tok_PFCand_, pfHandle);
 
-  edm::Handle<reco::VertexCollection> vtxHandle;
-  iEvent.getByToken(tok_Vertex_, vtxHandle);
-
   edm::Handle<reco::GsfElectronCollection> gsfElectronHandle;
   iEvent.getByToken(tok_GsfElec_, gsfElectronHandle);
   edm::Handle<double> rhoHandle_2012;
@@ -432,6 +440,18 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     if (genEventInfoProduct->hasBinningValues()) {
       eventPtHat_ = genEventInfoProduct->binningValues()[0];
     }
+  }
+
+
+  HERE("Get primary vertices");
+
+  // Get primary vertices
+  edm::Handle<reco::VertexCollection> pv;
+  iEvent.getByToken(tok_PV_,pv);
+  if(!pv.isValid()) {
+    edm::LogWarning("GammaJetAnalysis") << "Could not find Vertex named "
+					<< pvCollName_;
+    return;
   }
 
   runNumber_ = iEvent.id().run();
@@ -489,7 +509,7 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     tagPho_pfiso_myphoton03_  = pfEcalIso(photon_tag.photon(), pfHandle, 0.3, 0.0, 0.070, 0.015, 0.0, 0.0, 0.0, reco::PFCandidate::gamma);
     tagPho_pfiso_myneutral03_ = pfHcalIso(photon_tag.photon(), pfHandle, 0.3, 0.0, reco::PFCandidate::h0);
     HERE("calc charged pfiso");
-    tagPho_pfiso_mycharged03.push_back(pfTkIsoWithVertex(photon_tag.photon(), pfHandle, vtxHandle, 0.3, 0.02, 0.02, 0.0, 0.2, 0.1, reco::PFCandidate::h));
+    tagPho_pfiso_mycharged03.push_back(pfTkIsoWithVertex(photon_tag.photon(), pfHandle, pv, 0.3, 0.02, 0.02, 0.0, 0.2, 0.1, reco::PFCandidate::h));
 
     HERE("got isolation");
 
@@ -618,16 +638,6 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
       }
     }
 
-    HERE("Get primary vertices");
-
-    // Get primary vertices
-    edm::Handle<std::vector<reco::Vertex>> pv;
-    iEvent.getByToken(tok_PV_,pv);
-    if(!pv.isValid()) {
-      edm::LogWarning("GammaJetAnalysis") << "Could not find Vertex named "
-					  << pvCollName_;
-      return;
-    }
     pf_NPV_ = 0;
     for(std::vector<reco::Vertex>::const_iterator it=pv->begin(); it!=pv->end(); ++it){
       if(!it->isFake() && it->ndof() > 4) ++pf_NPV_;
@@ -642,6 +652,10 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     std::set<PFJetCorretPair, PFJetCorretPairComp> pfjetcorretpairset;
     for(reco::PFJetCollection::const_iterator it=pfjets->begin(); it!=pfjets->end(); ++it) {
       const reco::PFJet* jet=&(*it);
+      int idx= int(it - pfjets->begin());
+      if (idx==0) hJet1Pt->Fill( jet->pt() );
+      else if (idx==1) hJet2Pt->Fill( jet->pt() );
+      else if (idx==2) hJet3Pt->Fill( jet->pt() );
       // do not let the jet to be close to the tag photon
       if (deltaR(photon_tag,jet)<0.5) continue;
       double jec = correctorPF->correction(*it, iEvent, evSetup);
@@ -658,6 +672,10 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
       if(jet_cntr==1) pfjet_probe = jet;
       else if(jet_cntr==2) pf_2ndjet = jet;
       else if(jet_cntr==3) pf_3rdjet = jet;
+
+      if (jet_cntr==1) hJet1PtOrd->Fill( jet.jet()->pt() );
+      else if (jet_cntr==2) hJet2PtOrd->Fill( jet.jet()->pt() );
+      else if (jet_cntr==3) hJet3PtOrd->Fill( jet.jet()->pt() );
       //else break; // don't break for the statistics
     }
 
@@ -739,7 +757,7 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
       ppfjet_eta_   = pfjet_probe.jet()->eta();
       ppfjet_area_ = pfjet_probe.jet()->jetArea();
       ppfjet_E_     = pfjet_probe.jet()->energy();
-      ppfjet_E_NPVcorr_   = pfjet_probe.jet()->energy() - getNeutralPVCorr(ppfjet_eta_,pf_NPV_,ppfjet_area_,doGenJets_);
+      ppfjet_E_NPVcorr_   = pfjet_probe.jet()->energy() - getNeutralPVCorr(ppfjet_eta_,pf_NPV_,ppfjet_area_,!iEvent.isRealData());
       ppfjet_phi_   = pfjet_probe.jet()->phi();
       ppfjet_NeutralHadronFrac_  = pfjet_probe.jet()->neutralHadronEnergyFraction();
       ppfjet_NeutralEMFrac_      = pfjet_probe.jet()->neutralEmEnergyFraction();
@@ -1548,6 +1566,12 @@ GammaJetAnalysis::endJob() {
     misc_tree_->Branch("photonTriggerNames",&photonTrigNamesV_);
     misc_tree_->Branch("jetTriggerNames",&jetTrigNamesV_);
     misc_tree_->Branch("nProcessed",&nProcessed_,"nProcessed/l");
+    if (hJet1Pt) hJet1Pt->Write();
+    if (hJet2Pt) hJet2Pt->Write();
+    if (hJet3Pt) hJet3Pt->Write();
+    if (hJet1PtOrd) hJet1PtOrd->Write();
+    if (hJet2PtOrd) hJet2PtOrd->Write();
+    if (hJet3PtOrd) hJet3PtOrd->Write();
     // put time stamp
     time_t ltime;
     ltime=time(NULL);
