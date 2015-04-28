@@ -4,40 +4,28 @@ process = cms.Process('ANALYSIS')
 process.load('Configuration.StandardSequences.Services_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
-process.MessageLogger = cms.Service("MessageLogger",
-    destinations = cms.untracked.vstring('cout'),
-    categories = cms.untracked.vstring('GammaJetAnalysis'), 
-    debugModules = cms.untracked.vstring('*'),
-    cout = cms.untracked.PSet(
-        threshold = cms.untracked.string('INFO'),
-        INFO = cms.untracked.PSet(
-            limit = cms.untracked.int32(0)
-        ),
-        DEBUG = cms.untracked.PSet(
-            limit = cms.untracked.int32(0)
-        ),
-        GammaJetAnalysis = cms.untracked.PSet(
-            limit = cms.untracked.int32(-1)
-       )
-    )
-)
 
+# Load very verbose MessageLogger for GammaJetAnalysis
+#process.load("gammaJetMessager")
+#alternative message logger (little info from the analyzer)
+process.load('FWCore.MessageService.MessageLogger_cfi')
+process.MessageLogger.cerr.FwkReport.reportEvery=cms.untracked.int32(1000)
+
+# Specify IdealMagneticField ESSource (needed for CMSSW 730)
 process.load("Configuration.Geometry.GeometryIdeal_cff")
 process.load("MagneticField.Engine.autoMagneticFieldProducer_cfi")
 from Configuration.AlCa.autoCond import autoCond
 process.GlobalTag.globaltag=autoCond['startup']
 
-# Specify IdealMagneticField ESSource (needed for CMSSW 730)
-
-#load the response corrections calculator
+#load the gammaJet analyzer
 process.load('Calibration.HcalCalibAlgos.gammaJetAnalysis_cfi')
 #  needed for nonCHS
 process.load('JetMETCorrections.Configuration.JetCorrectionProducers_cff')
 
 # run over files
-process.GammaJetAnalysis.rootHistFilename = cms.string('PhoJet_tree_CHS_ported.root')
+process.GammaJetAnalysis.rootHistFilename = cms.string('PhoJet_tree_CHS.root')
 process.GammaJetAnalysis.doPFJets = cms.bool(True)
-process.GammaJetAnalysis.doGenJets = cms.bool(True)
+process.GammaJetAnalysis.doGenJets = cms.bool(False)
 
 # trigger names should not end with '_'
 process.GammaJetAnalysis.photonTriggers = cms.vstring(
@@ -57,7 +45,7 @@ process.GammaJetAnalysis.photonTriggers += cms.vstring(
 
 # a clone without CHS
 process.GammaJetAnalysis_noCHS= process.GammaJetAnalysis.clone()
-process.GammaJetAnalysis_noCHS.rootHistFilename = cms.string('PhoJet_tree_nonCHS_ported.root')
+process.GammaJetAnalysis_noCHS.rootHistFilename = cms.string('PhoJet_tree_nonCHS.root')
 # for 7XY use ak4* instead of ak5
 process.GammaJetAnalysis_noCHS.pfJetCollName = cms.string('ak4PFJets')
 process.GammaJetAnalysis_noCHS.pfJetCorrName = cms.string('ak4PFL2L3')
@@ -65,7 +53,6 @@ process.GammaJetAnalysis_noCHS.pfJetCorrName = cms.string('ak4PFL2L3')
 process.source = cms.Source("PoolSource", 
                             fileNames = cms.untracked.vstring(
         'file:../../HcalAlCaRecoProducers/test/gjet.root'
-#        'file:/tmp/andriusj/gjet.root'
 #    '/store/relval/CMSSW_7_3_0/RelValPhotonJets_Pt_10_13/GEN-SIM-RECO/MCRUN2_73_V7-v1/00000/522CE329-7B81-E411-B6C3-0025905A6110.root',
 #    '/store/relval/CMSSW_7_3_0/RelValPhotonJets_Pt_10_13/GEN-SIM-RECO/MCRUN2_73_V7-v1/00000/5279D224-7B81-E411-BCAA-002618943930.root'
 #    '/store/relval/CMSSW_7_3_0/RelValPhotonJets_Pt_10_13/GEN-SIM-RECO/MCRUN2_73_V7-v1/00000/522CE329-7B81-E411-B6C3-0025905A6110.root'
@@ -76,24 +63,13 @@ process.source = cms.Source("PoolSource",
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 process.options = cms.untracked.PSet( wantSummary = cms.untracked.bool(False) )
 
-# Load pfNoPileUP
-#process.load("CommonTools.ParticleFlow.pfNoPileUp_cff")
-#process.load("CommonTools.ParticleFlow.PF2PAT_cff")
-#from RecoJets.JetProducers.ak5PFJets_cfi import *
-#process.ak5PFJetsCHS = ak5PFJets.clone(
-#    src = cms.InputTag("pfNoPileUp")
-#)
-
-#process.load('Calibration.HcalCalibAlgos.gammaJetAnalysis_CHSJECs_cff')
 # name of the process that used the GammaJetProd producer
 process.GammaJetAnalysis.prodProcess = cms.untracked.string('MYGAMMAJET')
 # specify 'workOnAOD=2' to apply tokens from GammaJetProd producer
 process.GammaJetAnalysis.workOnAOD = cms.int32(2)
 process.GammaJetAnalysis.doGenJets = cms.bool(False)
-#process.GammaJetAnalysis.debug     = cms.untracked.int32(2)
+process.GammaJetAnalysis.debug     = cms.untracked.int32(0)
 
 process.p = cms.Path(
-#    process.PF2PAT
-#    +process.ak5PFJetsCHS
     process.GammaJetAnalysis
 )
