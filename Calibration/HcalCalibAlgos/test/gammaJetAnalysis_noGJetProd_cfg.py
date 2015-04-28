@@ -4,30 +4,9 @@ process = cms.Process('ANALYSIS')
 process.load('Configuration.StandardSequences.Services_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
-# Load very verbose MessageLogger for GammaJetAnalysis
-#process.load("gammaJetMessager")
-#alternative message logger (little info from the analyzer)
 process.load('FWCore.MessageService.MessageLogger_cfi')
-##process.MessageLogger.cerr.FwkReport.reportEvery=cms.untracked.int32(1000)
-
-# minimal MessageLogger for the GammaJetAnalysis
-#process.MessageLogger = cms.Service("MessageLogger",
-#    destinations = cms.untracked.vstring('cout'),
-#    categories = cms.untracked.vstring('GammaJetAnalysis'),
-#    debugModules = cms.untracked.vstring('*'),
-#    cout = cms.untracked.PSet(
-#        threshold = cms.untracked.string('INFO'),
-#        INFO = cms.untracked.PSet(
-#            limit = cms.untracked.int32(0)
-#        ),
-#       DEBUG = cms.untracked.PSet(
-#           limit = cms.untracked.int32(0)
-#       ),
-#        GammaJetAnalysis = cms.untracked.PSet(
-#            limit = cms.untracked.int32(-1)
-#       )
-#    )
-#)
+process.MessageLogger.categories+=cms.untracked.vstring('GammaJetAnalysis')
+#process.MessageLogger.cerr.FwkReport.reportEvery=cms.untracked.int32(1000)
 
 # Specify IdealMagneticField ESSource (needed for CMSSW 730)
 process.load("Configuration.Geometry.GeometryIdeal_cff")

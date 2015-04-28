@@ -4,10 +4,8 @@ process = cms.Process('ANALYSIS')
 process.load('Configuration.StandardSequences.Services_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
-# Load very verbose MessageLogger for GammaJetAnalysis
-#process.load("gammaJetMessager")
-#alternative message logger
 process.load('FWCore.MessageService.MessageLogger_cfi')
+process.MessageLogger.categories+=cms.untracked.vstring('GammaJetAnalysis')
 process.MessageLogger.cerr.FwkReport.reportEvery=cms.untracked.int32(1000)
 
 # Specify IdealMagneticField ESSource (needed for CMSSW 730)

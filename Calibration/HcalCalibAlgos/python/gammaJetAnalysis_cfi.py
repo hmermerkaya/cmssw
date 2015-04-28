@@ -36,5 +36,6 @@ GammaJetAnalysis = cms.EDAnalyzer('GammaJetAnalysis',
                                   doPFJets            = cms.bool(True),
                                   doGenJets           = cms.bool(True),
                                   debug               = cms.untracked.int32(0),
+                                  debugHLTTrigNames   = cms.untracked.int32(2),
                                   workOnAOD           = cms.int32(0)
                                   )

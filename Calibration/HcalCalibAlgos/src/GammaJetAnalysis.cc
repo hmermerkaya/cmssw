@@ -113,6 +113,7 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
   eventWeight_ = 1.0;
   eventPtHat_ = 0.;
   nProcessed_ = 0;
+  nSelected_ = 0;
 
   //Get the tokens
   // FAST FIX
@@ -193,7 +194,7 @@ GammaJetAnalysis::~GammaJetAnalysis() {}
 void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& evSetup) { 
   nProcessed_++;
 
-  edm::LogInfo("GammaJetAnalysis") << "nProcessed=" << nProcessed_ << "\n";
+  if (debug_>0) edm::LogInfo("GammaJetAnalysis") << "nProcessed=" << nProcessed_ << "\n";
 
   // 1st. Get Photons //
   edm::Handle<reco::PhotonCollection> photons;
@@ -210,7 +211,7 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
   }
 
   nPhotons_= photons->size();
-  edm::LogInfo("GammaJetAnalysis") << "nPhotons_=" << nPhotons_;
+  if (debug_>0) edm::LogInfo("GammaJetAnalysis") << "nPhotons_=" << nPhotons_;
 
   // Get photon quality flags
   edm::Handle<edm::ValueMap<Bool_t> > loosePhotonQual, tightPhotonQual;
@@ -339,15 +340,18 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     const edm::TriggerNames &evTrigNames =iEvent.triggerNames(*triggerResults);
 
     if (debugHLTTrigNames>0) {
-      if (debug_>1)  edm::LogInfo("GammaJetAnalysis") << "debugHLTTrigNames is on";
+      edm::LogInfo("GammaJetAnalysis") << "debugHLTTrigNames is on";
       const std::vector<std::string> *trNames= & evTrigNames.triggerNames();
       for (size_t i=0; i<trNames->size(); ++i) {
-	if (trNames->at(i).find("_Photon")!=std::string::npos) {
-	  if (debug_>1) edm::LogInfo("GammaJetAnalysis") << " - " << trNames->at(i);
+	int printName= (debugHLTTrigNames==2) ? 1:0;
+	if (trNames->at(i).find("_Photon")!=std::string::npos) printName=2;
+	if (printName) {
+	  std::string star=(printName==2) ? "\t ***" : "";
+	  edm::LogInfo("GammaJetAnalysis") << " - " << trNames->at(i) << star;
 	}
       }
-      if (debug_>1) edm::LogInfo("GammaJetAnalysis") << " ";
-      debugHLTTrigNames--;
+      edm::LogInfo("GammaJetAnalysis") << " ";
+      debugHLTTrigNames=0;
     }
 
     size_t id = 0;
@@ -575,7 +579,7 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     // Get RecHits in HB and HE
     edm::Handle<edm::SortedCollection<HBHERecHit,edm::StrictWeakOrdering<HBHERecHit>>> hbhereco;
     iEvent.getByToken(tok_HBHE_,hbhereco);
-    if(!hbhereco.isValid() && !workOnAOD_) {
+    if(!hbhereco.isValid() && (workOnAOD_!=1)) {
       edm::LogWarning("GammaJetAnalysis") << "Could not find HBHERecHit named "
 					  << hbheRecHitName_;
       return;
@@ -584,7 +588,7 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     // Get RecHits in HF
     edm::Handle<edm::SortedCollection<HFRecHit,edm::StrictWeakOrdering<HFRecHit>>> hfreco;
     iEvent.getByToken(tok_HF_,hfreco);
-    if(!hfreco.isValid() && !workOnAOD_) {
+    if(!hfreco.isValid() && (workOnAOD_!=1)) {
       edm::LogWarning("GammaJetAnalysis") << "Could not find HFRecHit named "
 					  << hfRecHitName_;
       return;
@@ -593,7 +597,7 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     // Get RecHits in HO
     edm::Handle<edm::SortedCollection<HORecHit,edm::StrictWeakOrdering<HORecHit>>> horeco;
     iEvent.getByToken(tok_HO_,horeco);
-    if(!horeco.isValid() && !workOnAOD_) {
+    if(!horeco.isValid() && (workOnAOD_!=1)) {
       edm::LogWarning("GammaJetAnalysis") << "Could not find HORecHit named "
 					  << hoRecHitName_;
       return;
@@ -1284,6 +1288,7 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
 
     // fill photon+jet variables
     pf_tree_->Fill();
+    nSelected_++;
     }
   }
   return;
@@ -1563,10 +1568,11 @@ GammaJetAnalysis::endJob() {
     misc_tree_->Branch("ignoreHLT",&ignoreHLT_,"ignoreHLT/O");
     misc_tree_->Branch("doPFJets",&doPFJets_,"doPFJets/O");
     misc_tree_->Branch("doGenJets",&doGenJets_,"doGenJets/O");
-    misc_tree_->Branch("workOnAOD",&workOnAOD_,"workOnAOD/O");
+    misc_tree_->Branch("workOnAOD",&workOnAOD_,"workOnAOD/I");
     misc_tree_->Branch("photonTriggerNames",&photonTrigNamesV_);
     misc_tree_->Branch("jetTriggerNames",&jetTrigNamesV_);
     misc_tree_->Branch("nProcessed",&nProcessed_,"nProcessed/l");
+    misc_tree_->Branch("nSelected",&nSelected_,"nSelected/l");
     if (hJet1Pt) hJet1Pt->Write();
     if (hJet2Pt) hJet2Pt->Write();
     if (hJet3Pt) hJet3Pt->Write();
@@ -1583,6 +1589,11 @@ GammaJetAnalysis::endJob() {
     misc_tree_->Fill();
     misc_tree_->Write();
     rootfile_->cd();
+  }
+
+  if ((nProcessed_>0) && (nSelected_==0)) {
+    edm::LogWarning("GammaJetAnalysis") << "nProcessed=" << nProcessed_
+					<< ", nSelected=" << nSelected_;
   }
 
   rootfile_->Close();

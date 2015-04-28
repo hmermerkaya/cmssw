@@ -216,7 +216,7 @@ private:
   float eventWeight_, eventPtHat_;
   int nPhotons_, nGenJets_;
   int nPFJets_;
-  ULong64_t nProcessed_;
+  ULong64_t nProcessed_,nSelected_;
   int pf_NPV_;
 
   /// MET info 
