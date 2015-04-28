@@ -159,7 +159,8 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
     //tok_tightPhoton_ = consumes<edm::ValueMap<Bool_t> >(edm::InputTag("PhotonIDProdGED:PhotonCutBasedIDTight"));
     tok_loosePhotonV_ = consumes<std::vector<Bool_t> >(edm::InputTag(prod,photonIDLooseCollName_.encode(),an));
     tok_tightPhotonV_ = consumes<std::vector<Bool_t> >(edm::InputTag(prod,photonIDTightCollName_.encode(),an));
-    tok_PFCand_      = consumes<reco::PFCandidateCollection>(edm::InputTag(prod,"particleFlow",an));
+    tok_PFCand_      = consumes<reco::PFCandidateCollection>(edm::InputTag("particleFlow"));
+    //tok_PFCand_      = consumes<reco::PFCandidateCollection>(edm::InputTag(prod,"particleFlow",an));
     tok_PV_      = consumes<reco::VertexCollection>(edm::InputTag(prod,pvCollName_,an));
     tok_GsfElec_     = consumes<reco::GsfElectronCollection>(edm::InputTag(prod,electronCollName_,an));
     tok_Rho_         = consumes<double>(edm::InputTag(prod,rhoCollection_.label(),an));
