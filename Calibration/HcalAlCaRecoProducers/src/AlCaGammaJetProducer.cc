@@ -141,11 +141,21 @@ bool AlCaGammaJetProducer::select (const reco::PhotonCollection &ph, const reco:
   if (ph.size()<1) return false;
   // Check the requirement for minimum pT
   // Assume ordered collections, but make no assumption about the direction
-  if (jt.begin()->pt() < minPtJet_) {
-    if (jt.back().pt() < minPtJet_) return false;
+  if ((jt.begin()->pt() < minPtJet_) && (jt.back().pt() < minPtJet_)) {
+    int found=0;
+    for (reco::PFJetCollection::const_iterator it= jt.begin()+1;
+	 !found && (it!=jt.end()); it++) {
+      if (it->pt() >= minPtJet_) found=1;
+    }
+    if (!found) return false;
   }
-  if (ph.begin()->pt() < minPtPhoton_) {
-    if (ph.back().pt() < minPtPhoton_) return false;
+  if ((ph.begin()->pt() < minPtPhoton_) && (ph.back().pt() < minPtPhoton_)) {
+    int found=0;
+    for (reco::PhotonCollection::const_iterator it= ph.begin()+1;
+	 !found && (it!=ph.end()); it++) {
+      if (it->pt() >= minPtPhoton_) found=1;
+    }
+    if (!found) return false;
   }
   return true;
 }
