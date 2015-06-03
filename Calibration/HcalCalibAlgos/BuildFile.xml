@@ -20,6 +20,9 @@
 <use   name="DataFormats/JetReco"/>
 <use   name="Geometry/CaloTopology"/>
 <use   name="Geometry/CaloGeometry"/>
+<use   name="JetMETCorrections/Objects"/>
+<use   name="JetMETCorrections/Type1MET"/>
+<use   name="HLTrigger/HLTcore"/>
 <use   name="CondTools/Hcal"/>
 <use   name="SimDataFormats/GeneratorProducts"/>
 <use   name="TrackPropagation/SteppingHelixPropagator"/>
