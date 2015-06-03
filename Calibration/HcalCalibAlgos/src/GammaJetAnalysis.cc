@@ -12,6 +12,7 @@
 #include "DataFormats/Common/interface/TriggerResults.h"
 #include "HLTrigger/HLTcore/interface/HLTConfigProvider.h"
 #include "FWCore/Common/interface/TriggerNames.h"
+#include "TMath.h"
 #include "TTree.h"
 #include "TFile.h"
 #include <iostream>
@@ -53,6 +54,80 @@ double getNeutralPVCorr(double eta, int intNPV, double area, bool isMC_) {
   return ECorr;
 }
 
+
+namespace EffectiveAreas {
+     const int nEtaBins = 7;
+     const float etaBinLimits[nEtaBins+1] = {
+          0.0, 1.0, 1.479, 2.0, 2.2, 2.3, 2.4, 2.5};
+
+     const float areaPhotons[nEtaBins] = {
+          0.078,
+          0.0629,
+          0.0264,
+          0.0462,
+          0.074,
+          0.0924,
+          0.1484
+     };
+     const float areaNeutralHadrons[nEtaBins] = {
+          0.0053,
+          0.0103,
+          0.0057,
+          0.007,
+          0.0152,
+          0.0232,
+          0.1709
+     };
+     const float areaChargedHadrons[nEtaBins] = {
+          0.0234,
+          0.0189,
+          0.0171,
+          0.0129,
+          0.011,
+          0.0074,
+          0.0035
+     };
+}
+
+namespace CutBasedPhotonID_Vars {
+     const float pt_min=5;
+     const int nWP=3;
+     const TString wpName[nWP] =
+     {"Loose", "Medium", "Tight"};
+
+     const float hOverECut[2][nWP] = 
+     { { 0.028, 0.012, 0.010 },
+          { 0.093, 0.023, 0.015 } };
+
+     const float sieieCut[2][nWP] = 
+     { {0.0107, 0.0100, 0.0100},
+          {0.0272, 0.0267, 0.0265} };
+
+     const float chIsoCut[2][nWP] = 
+     { {2.67, 1.79, 1.66},
+          {1.79, 1.09, 1.04} };
+
+     const float nhIso_A[2][nWP] = 
+     { {7.23, 0.16, 0.14},
+          {8.89, 4.31, 3.89} };
+
+     const float nhIso_B[2][nWP] = 
+     { {1.7173802, 1.7173802, 1.7173802},
+          {0.01725, 0.0172, 0.0172} };
+
+     const float phIso_A[2][nWP] = 
+     { {2.11, 1.90, 1.40},
+          {3.09, 1.90, 1.40} };
+
+     const float phIso_B[2][nWP] = 
+     { {0.0014, 0.0014, 0.0014},
+          {0.0091, 0.0091, 0.0091} };
+
+}
+
+
+
+
 // -------------------------------------------------
 
 inline
@@ -65,6 +140,7 @@ unsigned int helper_findTrigger(const std::vector<std::string>& list,
   }
   return list.size();
 }
+using namespace CutBasedPhotonID_Vars; 
 
 // -------------------------------------------------
 
@@ -138,6 +214,27 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
     tok_PFType1MET_  = consumes<reco::PFMETCollection>(pfType1METColl);
     tok_TrigRes_     = consumes<edm::TriggerResults>(edm::InputTag("TriggerResults::HLT"));
 
+    vtxToken_=consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>("vertices"));
+    photonCollectionToken_=consumes<edm::View<reco::Photon> >(iConfig.getParameter<edm::InputTag>("photons"));
+    rhoToken_=consumes<double> (iConfig.getParameter<edm::InputTag>("rho"));
+    genParticlesToken_=consumes<edm::View<reco::GenParticle> >
+         (iConfig.getParameter<edm::InputTag>("genParticles"));
+    full5x5SigmaIEtaIEtaMapToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("full5x5SigmaIEtaIEtaMap"));
+    phoChargedIsolationToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("phoChargedIsolation"));
+    phoNeutralHadronIsolationToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("phoNeutralHadronIsolation"));
+    phoPhotonIsolationToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("phoPhotonIsolation"));
+
+    phoLooseIdMapToken_=consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("phoLooseIdMap"));
+    phoMediumIdMapToken_=consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("phoMediumIdMap"));
+    phoTightIdMapToken_=consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("phoTightIdMap"));
+
+
+
+
   } else {
     // FAST FIX
     const char* prod= "GammaJetProd";
@@ -169,6 +266,29 @@ GammaJetAnalysis::GammaJetAnalysis(const edm::ParameterSet& iConfig) {
     tok_BS_          = consumes<reco::BeamSpot>(edm::InputTag(prod,offlineBSName_,an));
     tok_PFMET_       = consumes<reco::PFMETCollection>(edm::InputTag(prod,pfMETColl.label(),an));
     tok_PFType1MET_  = consumes<reco::PFMETCollection>(edm::InputTag(prod,pfType1METColl.label(),an));
+    vtxToken_=consumes<reco::VertexCollection>(edm::InputTag(prod,"offlinePrimaryVertices",an));
+    //vtxToken_=consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>("vertices"));
+    //photonCollectionToken_=consumes<edm::View<reco::Photon> > (edm::InputTag(prod,photonCollName_,an));
+    photonCollectionToken_=consumes<edm::View<reco::Photon> >(iConfig.getParameter<edm::InputTag>("photons"));
+    rhoToken_=consumes<double> (edm::InputTag(prod,(iConfig.getParameter<edm::InputTag>("rhoColl")).label(),an));
+    genParticlesToken_=consumes<edm::View<reco::GenParticle> >
+         (iConfig.getParameter<edm::InputTag>("genParticles"));
+    full5x5SigmaIEtaIEtaMapToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("full5x5SigmaIEtaIEtaMap"));
+    phoChargedIsolationToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("phoChargedIsolation"));
+    phoNeutralHadronIsolationToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("phoNeutralHadronIsolation"));
+    phoPhotonIsolationToken_=consumes <edm::ValueMap<float> >
+         (iConfig.getParameter<edm::InputTag>("phoPhotonIsolation"));
+
+    phoLooseIdMapToken_=consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("phoLooseIdMap"));
+    phoMediumIdMapToken_=consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("phoMediumIdMap"));
+    phoTightIdMapToken_=consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("phoTightIdMap"));
+
+    
+    
+    
     TString HLTlabel = "TriggerResults::HLT";
     if (prodProcess_.find("reRECO")!=std::string::npos)
       HLTlabel.ReplaceAll("HLT","reHLT");
@@ -429,21 +549,21 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     // Get GenParticles
     iEvent.getByToken(tok_GenPart_,genparticles);
     if(!genparticles.isValid()) {
-      edm::LogWarning("GammaJetAnalysis") << "Could not find GenParticle vector named " << genParticleCollName_;
-      return;
+         edm::LogWarning("GammaJetAnalysis") << "Could not find GenParticle vector named " << genParticleCollName_;
+         return;
     }
 
     // Get weights
     edm::Handle<GenEventInfoProduct> genEventInfoProduct;
     iEvent.getByToken(tok_GenEvInfo_, genEventInfoProduct);
     if(!genEventInfoProduct.isValid()){
-      edm::LogWarning("GammaJetAnalysis") << "Could not find GenEventInfoProduct named " << genEventInfoName_;
-      return;
+         edm::LogWarning("GammaJetAnalysis") << "Could not find GenEventInfoProduct named " << genEventInfoName_;
+         return;
     }
     eventWeight_ = genEventInfoProduct->weight();
     eventPtHat_ = 0.;
     if (genEventInfoProduct->hasBinningValues()) {
-      eventPtHat_ = genEventInfoProduct->binningValues()[0];
+         eventPtHat_ = genEventInfoProduct->binningValues()[0];
     }
   }
 
@@ -454,9 +574,9 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
   edm::Handle<reco::VertexCollection> pv;
   iEvent.getByToken(tok_PV_,pv);
   if(!pv.isValid()) {
-    edm::LogWarning("GammaJetAnalysis") << "Could not find Vertex named "
-					<< pvCollName_;
-    return;
+       edm::LogWarning("GammaJetAnalysis") << "Could not find Vertex named "
+            << pvCollName_;
+       return;
   }
 
   runNumber_ = iEvent.id().run();
@@ -464,6 +584,136 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
   eventNumber_ = iEvent.id().event();
 
   HERE(Form("runNumber=%d, eventNumber=%d",runNumber_,eventNumber_));
+  HERE("do cut-based photon id");
+
+  edm::Handle<edm::View<reco::Photon> > phoColl;
+  iEvent.getByToken(photonCollectionToken_, phoColl);
+  // Get rho
+  edm::Handle< double > rhoH;
+  iEvent.getByToken(rhoToken_,rhoH);
+  rho_ = *rhoH;
+  //  std::cout<<rho2012_<<" "<<rho_<<std::endl;
+  // Get generator level info
+  edm::Handle<edm::View<reco::GenParticle> > genParticles;
+  iEvent.getByToken(genParticlesToken_,genParticles);
+
+  // Get the full5x5 sieie map
+  edm::Handle<edm::ValueMap<float> > full5x5SigmaIEtaIEtaMap;
+  iEvent.getByToken(full5x5SigmaIEtaIEtaMapToken_, full5x5SigmaIEtaIEtaMap);
+
+  // Get the isolation maps
+  edm::Handle<edm::ValueMap<float> > phoChargedIsolationMap;
+  iEvent.getByToken(phoChargedIsolationToken_, phoChargedIsolationMap);
+  edm::Handle<edm::ValueMap<float> > phoNeutralHadronIsolationMap;
+  iEvent.getByToken(phoNeutralHadronIsolationToken_, phoNeutralHadronIsolationMap);
+  edm::Handle<edm::ValueMap<float> > phoPhotonIsolationMap;
+  iEvent.getByToken(phoPhotonIsolationToken_, phoPhotonIsolationMap);
+
+
+
+  // Clear vectors
+  nPhotons_ = 0;
+  pt_.clear();
+  eta_.clear();
+  phi_.clear();
+  full5x5_sigmaIetaIeta_.clear();
+  hOverE_.clear();
+  hasPixelSeed_.clear();
+  isoChargedHadrons_.clear();
+  isoNeutralHadrons_.clear();
+  isoPhotons_.clear();
+  isoChargedHadronsWithEA_.clear();
+  isoNeutralHadronsWithEA_.clear();
+  isoPhotonsWithEA_.clear();
+  isTrue_.clear();
+
+  Photons_id_tight_.clear();
+  Photons_id_medium_.clear();
+  Photons_id_loose_.clear();
+
+
+  for( edm::View<reco::Photon>::const_iterator pho = phoColl->begin();
+            pho != phoColl->end(); pho++){
+
+       // Kinematics
+       //   if( pho->pt() < 15 ) continue;
+
+       nPhotons_++;
+       pt_  .push_back( pho->pt() );
+       eta_ .push_back( pho->superCluster()->eta() );
+       phi_ .push_back( pho->superCluster()->phi() );
+
+       //const edm::Ptr<reco::Photon> phoPtr( pho );
+       const edm::Ptr<reco::Photon> phoPtr( phoColl, pho - phoColl->begin() );
+       if (!phoPtr) {
+
+            Photons_id_tight_.push_back(-1);
+            Photons_id_medium_.push_back(-1);
+            Photons_id_loose_.push_back(-1);
+
+       }
+
+       else  {
+            full5x5_sigmaIetaIeta_ .push_back( (*full5x5SigmaIEtaIEtaMap)[ phoPtr ] );
+            hOverE_                .push_back( pho->hadTowOverEm() );
+            hasPixelSeed_          .push_back( pho->hasPixelSeed() );
+
+            isoChargedHadrons_ .push_back( (*phoChargedIsolationMap)[phoPtr] );
+            isoNeutralHadrons_ .push_back( (*phoNeutralHadronIsolationMap)[phoPtr] );
+            isoPhotons_        .push_back( (*phoPhotonIsolationMap)[phoPtr] );
+            // Compute isolation with effective area correction for PU
+            // Find eta bin first. If eta>2.5, the last eta bin is used.
+            int etaBin = 0; 
+            while ( etaBin < EffectiveAreas::nEtaBins-1 
+                      && abs( pho->superCluster()->eta() ) > EffectiveAreas::etaBinLimits[etaBin+1] )
+            { ++etaBin; };
+            isoPhotonsWithEA_        .push_back( std::max( (float)0.0, (*phoPhotonIsolationMap)       [phoPtr] 
+                           - rho_ * EffectiveAreas::areaPhotons[etaBin] ) );
+            isoNeutralHadronsWithEA_ .push_back( std::max( (float)0.0, (*phoNeutralHadronIsolationMap)[phoPtr] 
+                           - rho_ * EffectiveAreas::areaNeutralHadrons[etaBin] ) );
+            isoChargedHadronsWithEA_ .push_back( std::max( (float)0.0, (*phoChargedIsolationMap)      [phoPtr] 
+                           - rho_ * EffectiveAreas::areaChargedHadrons[etaBin] ) );
+
+            isTrue_.push_back( matchToTruth(*pho, genParticles) );
+
+
+            bool isBarrel = (fabs(eta_.back()) < 1.479);
+            bool photons_ids[nWP];
+
+            photons_ids[WP_LOOSE]= passWorkingPoint( WP_LOOSE, isBarrel, pt_.back(),eta_.back(),
+                      hOverE_.back(),
+                      full5x5_sigmaIetaIeta_.back(),
+                      isoChargedHadronsWithEA_.back(),
+                      isoNeutralHadronsWithEA_.back(),
+                      isoPhotonsWithEA_.back() );
+
+            photons_ids[WP_MEDIUM]= passWorkingPoint( WP_MEDIUM, isBarrel, pt_.back(),eta_.back(),
+                      hOverE_.back(),
+                      full5x5_sigmaIetaIeta_.back(),
+                      isoChargedHadronsWithEA_.back(),
+                      isoNeutralHadronsWithEA_.back(),
+                      isoPhotonsWithEA_.back() );
+
+
+
+            photons_ids[WP_TIGHT]= passWorkingPoint( WP_TIGHT, isBarrel, pt_.back(),eta_.back(),
+                      hOverE_.back(),
+                      full5x5_sigmaIetaIeta_.back(),
+                      isoChargedHadronsWithEA_.back(),
+                      isoNeutralHadronsWithEA_.back(),
+                      isoPhotonsWithEA_.back() );
+
+            Photons_id_tight_.push_back(photons_ids[WP_TIGHT]); 
+            Photons_id_medium_.push_back(photons_ids[WP_MEDIUM]);
+            Photons_id_loose_.push_back(photons_ids[WP_LOOSE]);
+       }
+
+
+
+
+
+
+  }
 
   // fill tag photon variables
   if (!photon_tag.isValid()) {
@@ -486,6 +736,8 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
     tagPho_ConvSafeEleVeto_=0;
     tagPho_idTight_=0;
     tagPho_idLoose_=0;
+    tagPho_idRun2_=-1;
+    tagPho_idRun2_2_=-1; 
     tagPho_genPt_=0;
     tagPho_genEnergy_=0;
     tagPho_genEta_=0;
@@ -523,27 +775,136 @@ void GammaJetAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& 
 
     HERE("get id");
     if (workOnAOD_ < 2) {
-      HERE(Form("workOnAOD_<2. loose photon qual size=%d",int(loosePhotonQual->size())));
+         HERE(Form("workOnAOD_<2. loose photon qual size=%d",int(loosePhotonQual->size())));
 
-      edm::Ref<reco::PhotonCollection> photonRef(photons, photon_tag.idx());
-      HERE(Form("got photon ref, photon_tag.idx()=%d",photon_tag.idx()));
+         edm::Ref<reco::PhotonCollection> photonRef(photons, photon_tag.idx());
+         HERE(Form("got photon ref, photon_tag.idx()=%d",photon_tag.idx()));
 
-      //std::cout << "loosePhotonQual->at(photon_tag.idx())=" << loosePhotonQual->at(photon_tag.idx()) << std::endl;
+         //std::cout << "loosePhotonQual->at(photon_tag.idx())=" << loosePhotonQual->at(photon_tag.idx()) << std::endl;
 
-      tagPho_idLoose_ = (loosePhotonQual.isValid()) ? (*loosePhotonQual)[photonRef] : -1;
-      tagPho_idTight_ = (tightPhotonQual.isValid()) ? (*tightPhotonQual)[photonRef] : -1;
+         tagPho_idLoose_ = (loosePhotonQual.isValid()) ? (*loosePhotonQual)[photonRef] : -1;
+         tagPho_idTight_ = (tightPhotonQual.isValid()) ? (*tightPhotonQual)[photonRef] : -1;
     }
     else {
-      tagPho_idLoose_ = (loosePhotonQual_Vec.isValid()) ? loosePhotonQual_Vec->at(photon_tag.idx()) : -1;
-      tagPho_idTight_ = (tightPhotonQual_Vec.isValid()) ? tightPhotonQual_Vec->at(photon_tag.idx()) : -1; 
+         tagPho_idLoose_ = (loosePhotonQual_Vec.isValid()) ? loosePhotonQual_Vec->at(photon_tag.idx()) : -1;
+         tagPho_idTight_ = (tightPhotonQual_Vec.isValid()) ? tightPhotonQual_Vec->at(photon_tag.idx()) : -1; 
     }
 
     if (debug_>1) edm::LogInfo("GammaJetAnalysis")
-		    << "photon tag ID = " << tagPho_idLoose_ << " and "
-		    << tagPho_idTight_;
+         << "photon tag ID = " << tagPho_idLoose_ << " and "
+              << tagPho_idTight_;
 
     HERE(Form("tagPhoID= %d and %d",tagPho_idLoose_,tagPho_idTight_));
+    
+    
+    
+    HERE("tagPho_idRun2");
+    tagPho_idRun2_=0;
+    tagPho_idRun2_2_=0;
 
+
+    edm::Handle<edm::ValueMap<bool> > loose_id_decisions;
+    edm::Handle<edm::ValueMap<bool> > medium_id_decisions;
+    edm::Handle<edm::ValueMap<bool> > tight_id_decisions;
+    iEvent.getByToken(phoLooseIdMapToken_ ,loose_id_decisions);
+    iEvent.getByToken(phoMediumIdMapToken_,medium_id_decisions);
+    iEvent.getByToken(phoTightIdMapToken_ ,tight_id_decisions);
+
+
+    //edm::Ref<reco::PhotonCollection> phoPtr(phoColl,photon_tag.idx());
+    edm::Ptr<reco::Photon> phoPtr(phoColl, photon_tag.idx());
+    if (!phoPtr) {
+
+         tagPho_idRun2_=-1;
+
+         tagPho_idRun2_2_=-1;
+
+    } else {
+         bool isBarrel = (fabs(phoPtr->superCluster()->eta()) < 1.479);
+
+         bool  tagphoton_ids[nWP];
+
+         int etaBin = 0;
+         while ( etaBin < EffectiveAreas::nEtaBins-1
+                   && abs(  phoPtr->superCluster()->eta() ) > EffectiveAreas::etaBinLimits[etaBin+1] )
+         { ++etaBin; };
+         tagphoton_ids[WP_LOOSE]= passWorkingPoint( WP_LOOSE, isBarrel,phoPtr->pt(), phoPtr->superCluster()->eta(),
+                   phoPtr->hadTowOverEm(),
+                   (*full5x5SigmaIEtaIEtaMap)[ phoPtr ],
+
+                   std::max( (float)0.0, (*phoChargedIsolationMap)      [phoPtr]
+                        - rho_ * EffectiveAreas::areaChargedHadrons[etaBin] ) , 
+                   std::max( (float)0.0, (*phoNeutralHadronIsolationMap)[phoPtr]
+                        - rho_ * EffectiveAreas::areaNeutralHadrons[etaBin] ), 
+                   std::max( (float)0.0, (*phoPhotonIsolationMap)       [phoPtr]
+                        - rho_ * EffectiveAreas::areaPhotons[etaBin] ) 
+                   );
+
+         tagphoton_ids[WP_MEDIUM]= passWorkingPoint( WP_MEDIUM, isBarrel,phoPtr->pt(),phoPtr->superCluster()->eta(),
+                   phoPtr->hadTowOverEm(),
+                   (*full5x5SigmaIEtaIEtaMap)[ phoPtr ],
+
+                   std::max( (float)0.0, (*phoChargedIsolationMap)      [phoPtr]
+                        - rho_ * EffectiveAreas::areaChargedHadrons[etaBin] ) ,
+                   std::max( (float)0.0, (*phoNeutralHadronIsolationMap)[phoPtr]
+                        - rho_ * EffectiveAreas::areaNeutralHadrons[etaBin] ),
+                   std::max( (float)0.0, (*phoPhotonIsolationMap)       [phoPtr]
+                        - rho_ * EffectiveAreas::areaPhotons[etaBin] )
+                   );
+
+
+         tagphoton_ids[WP_TIGHT]= passWorkingPoint( WP_TIGHT, isBarrel,phoPtr->pt(),phoPtr->superCluster()->eta(),
+                   phoPtr->hadTowOverEm(),
+                   (*full5x5SigmaIEtaIEtaMap)[ phoPtr ],
+
+                   std::max( (float)0.0, (*phoChargedIsolationMap)      [phoPtr]
+                        - rho_ * EffectiveAreas::areaChargedHadrons[etaBin] ) ,
+                   std::max( (float)0.0, (*phoNeutralHadronIsolationMap)[phoPtr]
+                        - rho_ * EffectiveAreas::areaNeutralHadrons[etaBin] ),
+                   std::max( (float)0.0, (*phoPhotonIsolationMap)       [phoPtr]
+                        - rho_ * EffectiveAreas::areaPhotons[etaBin] )
+                   );
+
+         if (tagphoton_ids[WP_LOOSE]   ) tagPho_idRun2_++;
+         if (tagphoton_ids[WP_MEDIUM]  ) tagPho_idRun2_++;
+         if (tagphoton_ids[WP_TIGHT] ) tagPho_idRun2_++;
+
+
+
+         //         if (tagphoton_ids[WP_LOOSE] && !(tagphoton_ids[WP_MEDIUM] || tagphoton_ids[WP_TIGHT]) ) tagPho_idRun2_=1;
+         //       if (tagphoton_ids[WP_MEDIUM] && !tagphoton_ids[WP_TIGHT]  ) tagPho_idRun2_=2;
+         //     if (tagphoton_ids[WP_TIGHT] ) tagPho_idRun2_=3;
+
+         tagPho_eta2_   = phoPtr->superCluster()->eta();
+         tagPho_phi2_   = phoPtr->superCluster()->phi();
+         tagPho_full5x5sieie_ = (*full5x5SigmaIEtaIEtaMap)[ phoPtr ];
+
+         tagPho_isoChargedHadrons_ =(*phoChargedIsolationMap)[phoPtr];
+         tagPho_isoNeutralHadrons_ =(*phoNeutralHadronIsolationMap)[phoPtr];
+         tagPho_isoPhotons_ =(*phoPhotonIsolationMap)[phoPtr];
+
+         tagPho_isoChargedHadronsWithEA_ = std::max( (float)0.0, (*phoChargedIsolationMap)      [phoPtr]
+                   - rho_ * EffectiveAreas::areaChargedHadrons[etaBin] );
+         tagPho_isoNeutralHadronsWithEA_ =std::max( (float)0.0, (*phoNeutralHadronIsolationMap)[phoPtr]
+                   - rho_ * EffectiveAreas::areaNeutralHadrons[etaBin] );
+         tagPho_isoPhotonsWithEA_ = std::max( (float)0.0, (*phoPhotonIsolationMap)       [phoPtr]
+                   - rho_ * EffectiveAreas::areaPhotons[etaBin]);
+
+
+         tagPho_isTrue_= matchToTruth(*(phoPtr), genParticles) ;
+
+
+         bool isPassLoose  = (*loose_id_decisions)[phoPtr];
+         bool isPassMedium = (*medium_id_decisions)[phoPtr];
+         bool isPassTight  = (*tight_id_decisions)[phoPtr];
+         if (isPassLoose ) tagPho_idRun2_2_++;
+         if (isPassMedium  ) tagPho_idRun2_2_++;
+         if (isPassTight ) tagPho_idRun2_2_++;
+
+
+
+
+    } 
     HERE("reset pho gen");
     
     tagPho_genPt_=0;
@@ -1344,6 +1705,51 @@ void GammaJetAnalysis::beginJob()
     tree->Branch("tagPho_ConvSafeEleVeto", &tagPho_ConvSafeEleVeto_, "tagPho_ConvSafeEleVeto/I");
     tree->Branch("tagPho_idTight",&tagPho_idTight_, "tagPho_idTight/I");
     tree->Branch("tagPho_idLoose",&tagPho_idLoose_, "tagPho_idLoose/I");
+
+
+    //cut-based photon id
+
+    tree->Branch("tagPho_eta2",&tagPho_eta2_,"tagPho_eta2/F"); 
+    tree->Branch("tagPho_phi2",&tagPho_phi2_ ,"tagPho_phi2/F");
+    tree->Branch("tagPho_full5x5sieie",&tagPho_full5x5sieie_,"tagPho_full5x5sieie/F");
+
+    tree->Branch("tagPho_isoChargedHadrons",&tagPho_isoChargedHadrons_,"tagPho_isoChargedHadrons/F");
+    tree->Branch("tagPho_isoNeutralHadrons",&tagPho_isoNeutralHadrons_,"tagPho_isoNeutralHadrons/F");
+    tree->Branch("tagPho_isoPhotons",&tagPho_isoPhotons_,"tagPho_isoPhotons/F");
+
+    tree->Branch("tagPho_isoChargedHadronsWithEA",&tagPho_isoChargedHadronsWithEA_,"tagPho_isoChargedHadronsWithEA/F");
+    tree->Branch("tagPho_isoNeutralHadronsWithEA",&tagPho_isoNeutralHadronsWithEA_,"tagPho_isoNeutralHadronsWithEA/F");
+    tree->Branch("tagPho_isoPhotonsWithEA",&tagPho_isoPhotonsWithEA_,"tagPho_isoPhotonsWithEA/F");
+
+    tree->Branch("tagPho_isTrue"             , &tagPho_isTrue_,"tagPho_isTrue/I");
+
+    tree->Branch("tagPho_idRun2",&tagPho_idRun2_,"tagPho_idRun2/I");
+    tree->Branch("tagPho_idRun2_2",&tagPho_idRun2_2_,"tagPho_idRun2_2/I");
+
+    tree->Branch("nPV"        ,  &nPV_     , "nPV/I");
+    tree->Branch("rho"        ,  &rho_ , "rho/F");
+
+    // tree->Branch("nPho",  &nPhotons_ , "nPho/I");
+    tree->Branch("pt"  ,  &pt_    );
+    tree->Branch("eta" ,  &eta_ );
+    tree->Branch("phi" ,  &phi_ );
+
+    tree->Branch("hOverE",  &hOverE_);
+    tree->Branch("hasPixelSeed"           ,  &hasPixelSeed_);
+    tree->Branch("full5x5_sigmaIetaIeta"  , &full5x5_sigmaIetaIeta_);
+    tree->Branch("isoChargedHadrons"      , &isoChargedHadrons_);
+    tree->Branch("isoNeutralHadrons"      , &isoNeutralHadrons_);
+    tree->Branch("isoPhotons"             , &isoPhotons_);
+
+    tree->Branch("isoChargedHadronsWithEA"      , &isoChargedHadronsWithEA_);
+    tree->Branch("isoNeutralHadronsWithEA"      , &isoNeutralHadronsWithEA_);
+    tree->Branch("isoPhotonsWithEA"             , &isoPhotonsWithEA_);
+
+    tree->Branch("isTrue"             , &isTrue_);
+    tree->Branch("Photons_id_tight",&Photons_id_tight_);  
+    tree->Branch("Photons_id_medium",&Photons_id_medium_);
+    tree->Branch("Photons_id_loose",&Photons_id_loose_);
+  
     // gen.info on photon
     if(doGenJets_){
       tree->Branch("tagPho_genPt",&tagPho_genPt_, "tagPho_genPt/F");
@@ -1963,14 +2369,127 @@ double GammaJetAnalysis::deltaR(const double eta1, const double phi1, const doub
 
 int GammaJetAnalysis::getEtaPhi(const DetId id)
 {
-  return id.rawId() & 0x3FFF; // Get 14 least-significant digits
+     return id.rawId() & 0x3FFF; // Get 14 least-significant digits
 }
 
 // ---------------------------------------------------------------------
 
 int GammaJetAnalysis::getEtaPhi(const HcalDetId id)
 {
-  return id.rawId() & 0x3FFF; // Get 14 least-significant digits
+     return id.rawId() & 0x3FFF; // Get 14 least-significant digits
+}
+
+int GammaJetAnalysis::matchToTruth(const reco::Photon &pho, 
+          const edm::Handle<edm::View<reco::GenParticle>>  
+          &genParticles)
+{
+     // 
+     // Explicit loop and geometric matching method 
+     //
+
+     // Find the closest status 1 gen photon to the reco photon
+     double dR = 999;
+     const reco::Candidate *closestPhoton = 0;
+     for(size_t i=0; i<genParticles->size();i++){
+          const reco::Candidate *particle = &(*genParticles)[i];
+          // Drop everything that is not photon or not status 1
+          if( abs(particle->pdgId()) != 22 || particle->status() != 1 )
+               continue;
+          //
+          double dRtmp = ROOT::Math::VectorUtil::DeltaR( pho.p4(), particle->p4() );
+          if( dRtmp < dR ){
+               dR = dRtmp;
+               closestPhoton = particle;
+          }
+     }
+     // See if the closest photon (if it exists) is close enough.
+     // If not, no match found.
+     if( !(closestPhoton != 0 && dR < 0.1) ) {
+          return UNMATCHED;
+     }
+
+     // Find ID of the parent of the found generator level photon match
+     int ancestorPID = -999; 
+     int ancestorStatus = -999;
+     findFirstNonPhotonMother(closestPhoton, ancestorPID, ancestorStatus);
+
+     // Allowed parens: quarks pdgId 1-5, or a gluon 21
+     std::vector<int> allowedParents { -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -21, 21 };
+     if( !(std::find(allowedParents.begin(), 
+                         allowedParents.end(), ancestorPID)
+                    != allowedParents.end()) ){
+          // So it is not from g, u, d, s, c, b. Check if it is from pi0 or not. 
+          if( abs(ancestorPID) == 111 )
+               return MATCHED_FROM_PI0;
+          else
+               return MATCHED_FROM_OTHER_SOURCES;
+     }
+     return MATCHED_FROM_GUDSCB;
+
+}
+
+void GammaJetAnalysis::findFirstNonPhotonMother(const reco::Candidate *particle,
+          int &ancestorPID, int &ancestorStatus){
+
+     if( particle == 0 ){
+          printf("PhotonNtuplerAOD: ERROR! null candidate pointer, this should never happen\n");
+          return;
+     }
+
+     // Is this the first non-photon parent? If yes, return, otherwise
+     // go deeper into recursion
+     if( abs(particle->pdgId()) == 22 ){
+          findFirstNonPhotonMother(particle->mother(0), ancestorPID, ancestorStatus);
+     }else{
+          ancestorPID = particle->pdgId();
+          ancestorStatus = particle->status();
+     }
+
+     return;
+}
+
+bool  GammaJetAnalysis::passWorkingPoint(WpType iwp, bool isBarrel, float pt, float eta,
+          float hOverE, float full5x5_sigmaIetaIeta, 
+          float chIso, float nhIso, float phIso){
+
+     int ieta = 0;
+     if( !isBarrel )
+          ieta = 1;
+
+     if (ieta==0){
+          bool result = 1
+               && pt>CutBasedPhotonID_Vars::pt_min
+               && (fabs(eta)<1.4442 || fabs(eta)>1.566)
+               && fabs(eta)<2.5
+               && hOverE < CutBasedPhotonID_Vars::hOverECut[ieta][iwp]
+               && full5x5_sigmaIetaIeta > 0
+               && full5x5_sigmaIetaIeta < CutBasedPhotonID_Vars::sieieCut[ieta][iwp]
+               && chIso < CutBasedPhotonID_Vars::chIsoCut[ieta][iwp]
+               && nhIso < CutBasedPhotonID_Vars::nhIso_A[ieta][iwp] + TMath::Exp(0.0028*pt) * CutBasedPhotonID_Vars::nhIso_B[ieta][iwp]
+               && phIso < CutBasedPhotonID_Vars::phIso_A[ieta][iwp] + pt * CutBasedPhotonID_Vars::phIso_B[ieta][iwp] ;
+
+
+          return result;
+     }
+     else {
+          bool result = 1
+               && pt>CutBasedPhotonID_Vars::pt_min
+               && (fabs(eta)<1.4442 || fabs(eta)>1.566)
+               && fabs(eta)<2.5
+               && hOverE < CutBasedPhotonID_Vars::hOverECut[ieta][iwp]
+               && full5x5_sigmaIetaIeta > 0 
+               && full5x5_sigmaIetaIeta < CutBasedPhotonID_Vars::sieieCut[ieta][iwp]
+               && chIso < CutBasedPhotonID_Vars::chIsoCut[ieta][iwp]
+               && nhIso < CutBasedPhotonID_Vars::nhIso_A[ieta][iwp] + pt *CutBasedPhotonID_Vars::nhIso_B[ieta][iwp]
+               && phIso < CutBasedPhotonID_Vars::phIso_A[ieta][iwp] + pt * CutBasedPhotonID_Vars::phIso_B[ieta][iwp] ;
+
+
+          return result;
+
+     }
+
+
+
 }
 
 // ---------------------------------------------------------------------

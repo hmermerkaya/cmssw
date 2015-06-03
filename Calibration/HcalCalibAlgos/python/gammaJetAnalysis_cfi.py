@@ -37,5 +37,18 @@ GammaJetAnalysis = cms.EDAnalyzer('GammaJetAnalysis',
                                   doGenJets           = cms.bool(True),
                                   debug               = cms.untracked.int32(0),
                                   debugHLTTrigNames   = cms.untracked.int32(2),
-                                  workOnAOD           = cms.int32(0)
+                                  workOnAOD           = cms.int32(0),
+                                  photons = cms.InputTag("gedPhotons"),
+                                  vertices = cms.InputTag("offlinePrimaryVertices"),
+                                  rho = cms.InputTag("fixedGridRhoFastjetAll"),
+                                  genParticles = cms.InputTag("genParticles"),
+                                  full5x5SigmaIEtaIEtaMap   = cms.InputTag("photonIDValueMapProducer:phoFull5x5SigmaIEtaIEta"),
+                                  phoChargedIsolation = cms.InputTag("photonIDValueMapProducer:phoChargedIsolation"),
+                                  phoNeutralHadronIsolation = cms.InputTag("photonIDValueMapProducer:phoNeutralHadronIsolation"),
+                                  phoPhotonIsolation = cms.InputTag("photonIDValueMapProducer:phoPhotonIsolation"),
+                                  phoLooseIdMap = cms.InputTag("egmPhotonIDs:cutBasedPhotonID-PHYS14-PU20bx25-V2-standalone-loose"),
+                                  phoMediumIdMap = cms.InputTag("egmPhotonIDs:cutBasedPhotonID-PHYS14-PU20bx25-V2-standalone-medium"),
+                                  phoTightIdMap = cms.InputTag("egmPhotonIDs:cutBasedPhotonID-PHYS14-PU20bx25-V2-standalone-tight")                              
+                                  
+                                  
                                   )

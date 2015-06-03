@@ -6,4 +6,8 @@ from PhysicsTools.SelectorUtils.centralIDRegistry import central_id_registry
 # else is needed for IDs
 from RecoEgamma.PhotonIdentification.PhotonIDValueMapProducer_cfi import *
 
+
 egmPhotonIDSequence = cms.Sequence(photonIDValueMapProducer * egmPhotonIDs)
+PhotonIDValueMapSeq = cms.Sequence(photonIDValueMapProducer )
+egmPhotonIDSeq = cms.Sequence( egmPhotonIDs)
+

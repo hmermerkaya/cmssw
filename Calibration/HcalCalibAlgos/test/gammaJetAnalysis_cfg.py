@@ -35,11 +35,8 @@ process.GammaJetAnalysis.photonTriggers += cms.vstring(
     'HLT_Photon22', 'HLT_Photon30', 'HLT_Photon36',
     'HLT_Photon50', 'HLT_Photon75',
     'HLT_Photon90', 'HLT_Photon120', 'HLT_Photon175',
-    'HLT_Photon250_NoHE', 'HLT_Photon300_NoHE'
-)
+    'HLT_Photon250_NoHE', 'HLT_Photon300_NoHE')
 # to disable photonTriggers assign an empty vstring
-#process.GammaJetAnalysis.photonTriggers = cms.vstring()
-
 # a clone without CHS
 process.GammaJetAnalysis_noCHS= process.GammaJetAnalysis.clone()
 process.GammaJetAnalysis_noCHS.rootHistFilename = cms.string('PhoJet_tree_nonCHS.root')
@@ -49,7 +46,7 @@ process.GammaJetAnalysis_noCHS.pfJetCorrName = cms.string('ak4PFL2L3')
 
 process.source = cms.Source("PoolSource", 
                             fileNames = cms.untracked.vstring(
-        'file:../../HcalAlCaRecoProducers/test/gjet.root'
+        'file:../../HcalAlCaRecoProducers/test/gnew4jet.root'
 #    '/store/relval/CMSSW_7_3_0/RelValPhotonJets_Pt_10_13/GEN-SIM-RECO/MCRUN2_73_V7-v1/00000/522CE329-7B81-E411-B6C3-0025905A6110.root',
 #    '/store/relval/CMSSW_7_3_0/RelValPhotonJets_Pt_10_13/GEN-SIM-RECO/MCRUN2_73_V7-v1/00000/5279D224-7B81-E411-BCAA-002618943930.root'
 #    '/store/relval/CMSSW_7_3_0/RelValPhotonJets_Pt_10_13/GEN-SIM-RECO/MCRUN2_73_V7-v1/00000/522CE329-7B81-E411-B6C3-0025905A6110.root'
@@ -67,6 +64,27 @@ process.GammaJetAnalysis.workOnAOD = cms.int32(2)
 process.GammaJetAnalysis.doGenJets = cms.bool(False)
 process.GammaJetAnalysis.debug     = cms.untracked.int32(0)
 
+
+
+from PhysicsTools.SelectorUtils.tools.vid_id_tools import *
+# turn on VID producer, indicate data format  to be
+# DataFormat.AOD or DataFormat.MiniAOD, as appropriate
+#if useAOD == True :
+dataFormat = DataFormat.AOD
+#else :
+#dataFormat = DataFormat.MiniAOD
+
+switchOnVIDPhotonIdProducer(process, dataFormat)
+
+# define which IDs we want to produce
+my_id_modules = ['RecoEgamma.PhotonIdentification.Identification.cutBasedPhotonID_PHYS14_PU20bx25_V2_cff']
+
+#add them to the VID producer
+for idmod in my_id_modules:
+         setupAllVIDIdsInModule(process,idmod,setupVIDPhotonSelection)
+
 process.p = cms.Path(
-    process.GammaJetAnalysis
+ #  process.egmPhotonIDSeq*
+ process.egmPhotonIDs*process.GammaJetAnalysis
+
 )

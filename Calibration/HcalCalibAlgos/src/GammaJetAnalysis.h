@@ -125,6 +125,13 @@ public:
   float pfHcalIso(const reco::Photon* localPho,edm::Handle<reco::PFCandidateCollection> pfHandle,float dRmax, float dRveto,reco::PFCandidate::ParticleType pfToUse);
 
   std::vector<float> pfTkIsoWithVertex(const reco::Photon* localPho1, edm::Handle<reco::PFCandidateCollection> pfHandle, edm::Handle<reco::VertexCollection> vtxHandle, float dRmax, float dRvetoBarrel, float dRvetoEndcap, float ptMin, float dzMax, float dxyMax, reco::PFCandidate::ParticleType pfToUse);
+  enum PhotonMatchType {UNMATCHED = 0, 
+       MATCHED_FROM_GUDSCB,
+       MATCHED_FROM_PI0,
+       MATCHED_FROM_OTHER_SOURCES};
+  enum WpType { WP_LOOSE = 0,
+       WP_MEDIUM, 
+       WP_TIGHT};
 
 private:
   virtual void beginJob();//(const edm::EventSetup&);
@@ -132,6 +139,14 @@ private:
   virtual void endJob();
   void beginRun(const edm::Run&, const edm::EventSetup&);
 
+  int matchToTruth(const reco::Photon &pho, 
+            const edm::Handle<edm::View<reco::GenParticle>>  &genParticles);
+  
+  void findFirstNonPhotonMother(const reco::Candidate *particle,
+                          int &ancestorPID, int &ancestorStatus);
+  bool  passWorkingPoint(WpType iwp, bool isBarrel, float pt, float eta,
+            float hOverE, float full5x5_sigmaIetaIeta,
+            float chIso, float nhIso, float phIso);  
   
   // parameters
   int debug_;                      // print debug statements
@@ -190,6 +205,22 @@ private:
   edm::EDGetTokenT<reco::PFMETCollection>           tok_PFMET_;
   edm::EDGetTokenT<reco::PFMETCollection>           tok_PFType1MET_;
   edm::EDGetTokenT<edm::TriggerResults>             tok_TrigRes_;
+
+  edm::EDGetTokenT<reco::VertexCollection> vtxToken_;
+  edm::EDGetTokenT<edm::View<reco::Photon> > photonCollectionToken_;
+  edm::EDGetTokenT<double> rhoToken_;
+  edm::EDGetTokenT<edm::View<reco::GenParticle> > genParticlesToken_;
+  edm::EDGetTokenT<edm::ValueMap<float> > full5x5SigmaIEtaIEtaMapToken_;
+  edm::EDGetTokenT<edm::ValueMap<float> > phoChargedIsolationToken_;
+  edm::EDGetTokenT<edm::ValueMap<float> > phoNeutralHadronIsolationToken_;
+  edm::EDGetTokenT<edm::ValueMap<float> > phoPhotonIsolationToken_;
+  edm::EDGetTokenT<edm::ValueMap<bool> > phoLooseIdMapToken_;
+  edm::EDGetTokenT<edm::ValueMap<bool> > phoMediumIdMapToken_;
+  edm::EDGetTokenT<edm::ValueMap<bool> > phoTightIdMapToken_;
+
+
+
+
   bool doPFJets_;                   // use PFJets
   bool doGenJets_;                  // use GenJets
   int  workOnAOD_;
@@ -235,16 +266,60 @@ private:
   float tagPho_genPt_, tagPho_genEnergy_, tagPho_genEta_, tagPho_genPhi_;
   float tagPho_genDeltaR_;
 
-  // Particle-flow jets
-  // leading Et jet info
-  float ppfjet_pt_, ppfjet_p_, ppfjet_E_, ppfjet_eta_, ppfjet_phi_, ppfjet_scale_;
-  float ppfjet_area_, ppfjet_E_NPVcorr_;
-  float ppfjet_NeutralHadronFrac_, ppfjet_NeutralEMFrac_;
-  int ppfjet_nConstituents_;
-  float ppfjet_ChargedHadronFrac_, ppfjet_ChargedMultiplicity_, ppfjet_ChargedEMFrac_;
-  float ppfjet_gendr_, ppfjet_genpt_, ppfjet_genp_, ppfjet_genE_;
-  float ppfjet_unkown_E_, ppfjet_unkown_px_, ppfjet_unkown_py_, ppfjet_unkown_pz_, ppfjet_unkown_EcalE_;
-  float ppfjet_electron_E_, ppfjet_electron_px_, ppfjet_electron_py_, ppfjet_electron_pz_, ppfjet_electron_EcalE_;
+//cut-based photon id  info
+  int tagPho_idRun2_;
+  int tagPho_idRun2_2_;
+   
+   float tagPho_eta2_ ; 
+   float tagPho_phi2_ ;
+   float tagPho_full5x5sieie_ ;
+
+   float tagPho_isoChargedHadrons_; 
+   float tagPho_isoNeutralHadrons_;
+   float tagPho_isoPhotons_;
+   float tagPho_isoChargedHadronsWithEA_;
+   float tagPho_isoNeutralHadronsWithEA_;
+   float tagPho_isoPhotonsWithEA_;
+   int tagPho_isTrue_;  
+
+  // all photon variables
+  //  int nPhotons_;
+   int nPV_;        // number of reconsrtucted primary vertices
+   float rho_;  
+   std::vector<float> pt_;
+   std::vector<float> eta_;
+   std::vector<float> phi_;
+
+   std::vector<float> full5x5_sigmaIetaIeta_;
+   std::vector<float> hOverE_;
+   std::vector<float> hasPixelSeed_;
+
+   std::vector<float> isoChargedHadrons_;
+   std::vector<float> isoNeutralHadrons_;
+   std::vector<float> isoPhotons_;
+
+   std::vector<float> isoChargedHadronsWithEA_;
+   std::vector<float> isoNeutralHadronsWithEA_;
+   std::vector<float> isoPhotonsWithEA_;
+
+   std::vector<int> isTrue_;
+
+
+   std::vector<int> Photons_id_tight_;
+   std::vector<int> Photons_id_medium_;
+   std::vector<int> Photons_id_loose_;
+
+
+   // Particle-flow jets
+   // leading Et jet info
+   float ppfjet_pt_, ppfjet_p_, ppfjet_E_, ppfjet_eta_, ppfjet_phi_, ppfjet_scale_;
+   float ppfjet_area_, ppfjet_E_NPVcorr_;
+   float ppfjet_NeutralHadronFrac_, ppfjet_NeutralEMFrac_;
+   int ppfjet_nConstituents_;
+   float ppfjet_ChargedHadronFrac_, ppfjet_ChargedMultiplicity_, ppfjet_ChargedEMFrac_;
+   float ppfjet_gendr_, ppfjet_genpt_, ppfjet_genp_, ppfjet_genE_;
+   float ppfjet_unkown_E_, ppfjet_unkown_px_, ppfjet_unkown_py_, ppfjet_unkown_pz_, ppfjet_unkown_EcalE_;
+   float ppfjet_electron_E_, ppfjet_electron_px_, ppfjet_electron_py_, ppfjet_electron_pz_, ppfjet_electron_EcalE_;
   float ppfjet_muon_E_, ppfjet_muon_px_, ppfjet_muon_py_, ppfjet_muon_pz_, ppfjet_muon_EcalE_;
   float ppfjet_photon_E_, ppfjet_photon_px_, ppfjet_photon_py_, ppfjet_photon_pz_, ppfjet_photon_EcalE_;
   int ppfjet_unkown_n_, ppfjet_electron_n_, ppfjet_muon_n_, ppfjet_photon_n_;
