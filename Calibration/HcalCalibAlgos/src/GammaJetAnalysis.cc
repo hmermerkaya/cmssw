@@ -2459,7 +2459,7 @@ bool  GammaJetAnalysis::passWorkingPoint(WpType iwp, bool isBarrel, float pt, fl
      if (ieta==0){
           bool result = 1
                && pt>CutBasedPhotonID_Vars::pt_min
-               && (fabs(eta)<1.4442 || fabs(eta)>1.566)
+               //&& (fabs(eta)<1.4442 || fabs(eta)>1.566)
                && fabs(eta)<2.5
                && hOverE < CutBasedPhotonID_Vars::hOverECut[ieta][iwp]
                && full5x5_sigmaIetaIeta > 0
@@ -2474,7 +2474,7 @@ bool  GammaJetAnalysis::passWorkingPoint(WpType iwp, bool isBarrel, float pt, fl
      else {
           bool result = 1
                && pt>CutBasedPhotonID_Vars::pt_min
-               && (fabs(eta)<1.4442 || fabs(eta)>1.566)
+              // && (fabs(eta)<1.4442 || fabs(eta)>1.566)
                && fabs(eta)<2.5
                && hOverE < CutBasedPhotonID_Vars::hOverECut[ieta][iwp]
                && full5x5_sigmaIetaIeta > 0 
